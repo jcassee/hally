@@ -1,0 +1,29 @@
+{
+  "name": "hally",
+  "version": "0.1.0",
+  "description": "Module for getting and putting HAL resources",
+  "author": "Joost Cassee <joost@cassee.net>",
+  "license": "MIT",
+  "keywords": [
+    "hal",
+    "hypermedia",
+    "hateoas",
+    "rest"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jcassee/hally"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "isomorphic-fetch": "^2.2.0",
+    "uri-templates": "^0.2.0"
+  },
+  "devDependencies": {
+    "fetch-mock": "5.11.0",
+    "jest": "20.0.4"
+  }
+}
