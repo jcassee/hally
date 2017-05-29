@@ -48,6 +48,16 @@ Install using NPM:
 
     npm install hally --save
 
-Hally uses [promises](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises).
-Promises are [available on most modern platforms](https://kangax.github.io/compat-table/es6/#test-Promise),
-but older environments may require a [polyfill](https://github.com/stefanpenner/es6-promise).
+Hally uses the [WHATWG Fetch API](https://fetch.spec.whatwg.org) to make HTTP
+requests. It is available on [modern browsers](http://caniuse.com/#feat=fetch).
+For older browsers a [polyfill](https://github.com/github/fetch) is available.
+Alternatively, and on Node.js, use the [isomorphic-fetch](https://github.com/matthew-andrews/isomorphic-fetch)
+polyfill:
+
+    npm install isomorphic-fetch --save
+
+You also need a [Promise](https://promisesaplus.com) implementation. Promises are
+[available on most modern platforms](https://kangax.github.io/compat-table/es6/#test-Promise),
+but older environments may require a [polyfill](https://github.com/taylorhakes/promise-polyfill):
+
+    npm install promise-polyfill --save
