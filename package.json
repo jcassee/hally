@@ -16,13 +16,15 @@
   },
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest --coverage",
+    "coveralls": "coveralls < coverage/lcov.info"
   },
   "dependencies": {
     "isomorphic-fetch": "^2.2.0",
     "uri-templates": "^0.2.0"
   },
   "devDependencies": {
+    "coveralls": "2.13.1",
     "fetch-mock": "5.11.0",
     "jest": "20.0.4"
   },
