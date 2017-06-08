@@ -17,94 +17,12 @@ afterEach(function () {
 })
 
 
-describe('linkHref', function() {
-  var linkHref = hally.linkHref;
+describe('halJson', function() {
+  var halJson = hally.halJson;
 
-  var resource = {
-    _links: {
-      self: {href: 'http://example.com'},
-      rel1: {href: 'http://example.com/linked1'},
-      rel2: [{href: 'http://example.com/linked2a'}, {href: 'http://example.com/linked2b'}],
-      tpl1: {href: 'http://example.com/templated1/{foo}'},
-      tpl2: [{href: 'http://example.com/templated2a/{foo}'}, {href: 'http://example.com/templated2b/{foo}'}],
-      both: {href: 'http://example.com/both/linked'}
-    },
-    _embedded: {
-      emb1: {_links: {self: {href: 'http://example.com/embedded1'}}, _embedded: {}},
-      emb2: [{_links: {self: {href: 'http://example.com/embedded2a'}}, _embedded: {}},
-        {_links: {self: {href: 'http://example.com/embedded2b'}}, _embedded: {}}],
-      both: {_links: {self: {href: 'http://example.com/both/embedded'}}, _embedded: {}}
-    }
-  };
+  var opts = {headers: {'Accept': 'application/hal+json'}};
 
-  it('returns the href of a link', function() {
-    expect(linkHref(resource, 'rel1')).toEqual('http://example.com/linked1');
-  });
-
-  it('returns the href of a link array', function() {
-    expect(linkHref(resource, 'rel2')).toEqual(['http://example.com/linked2a', 'http://example.com/linked2b']);
-  });
-
-  it('returns the href of a templated link', function() {
-    expect(linkHref(resource, 'tpl1', {foo: 'bar'})).toEqual('http://example.com/templated1/bar');
-  });
-
-  it('returns the href of a templated link array', function() {
-    expect(linkHref(resource, 'tpl2', {foo: 'bar'}))
-        .toEqual(['http://example.com/templated2a/bar', 'http://example.com/templated2b/bar']);
-  });
-
-  it('returns the href of an embedded resource', function() {
-    expect(linkHref(resource, 'emb1')).toEqual('http://example.com/embedded1');
-  });
-
-  it('returns the href of an embedded resource array', function() {
-    expect(linkHref(resource, 'emb2'))
-        .toEqual(['http://example.com/embedded2a', 'http://example.com/embedded2b']);
-  });
-
-  it('returns the href of a linked resources even when an embedded resource exists', function() {
-    expect(linkHref(resource, 'both')).toEqual('http://example.com/both/linked');
-  });
-
-  it('returns undefined if a link does not exist', function() {
-    expect(linkHref(resource, 'nonexistent')).toBeUndefined();
-  });
-
-});
-
-
-describe('toState', function() {
-  var toState = hally.toState;
-
-  it('removes the _links and _embedded properties', function() {
-    var resource = {
-      property: 'value',
-      _links: {
-        self: {href: 'http://example.com'}
-      },
-      _embedded: {
-        other: {
-          _links: {
-            self: {href: 'http://example.com/other'}
-          },
-          _embedded: {}
-        }
-      }
-    };
-
-    var state = toState(resource)
-    expect(state).toEqual({property: 'value'});
-  });
-
-});
-
-
-describe('getHal', function() {
-  var getHal = hally.getHal;
-  var embed = hally.embed;
-
-  it('gets a resource', function () {
+  it('parses a resource', function () {
     var resource = {
       property: 'value',
       _links: {
@@ -115,7 +33,7 @@ describe('getHal', function() {
 
     fetchMock.get('*', resource);
 
-    return getHal('http://example.com').then(function (res) {
+    return fetch('http://example.com', opts).then(halJson(opts)).then(function (res) {
       // Verify request
       expect(fetchMock.calls('*')).toEqual([[
         'http://example.com',
@@ -140,12 +58,12 @@ describe('getHal', function() {
 
     fetchMock.get('*', resource);
 
-    return getHal('http://example.com').then(function (res) {
-      expect(res._embedded).toEqual({});
+    return fetch('http://example.com', opts).then(halJson(opts)).then(function (res) {
+      expect(res).toHaveProperty('_embedded', {});
     });
   });
 
-  it('embeds a linked resource', function () {
+  describe('embeds a linked resource', function () {
     var resources = {
       'http://example.com': {
         _links: {
@@ -161,25 +79,37 @@ describe('getHal', function() {
       }
     };
 
-    fetchMock.get('*', function (url, opts) {
-      return resources[url];
-    })
+    beforeEach(function () {
+      fetchMock.get('*', function (url, opts) {
+        return resources[url];
+      });
+    });
 
-    return getHal('http://example.com', embed('other')).then(function (res) {
-      expect(res).toEqual({
-        _links: {
-          self: {href: 'http://example.com'},
-          other: {href: 'http://example.com/other'}
-        },
-        _embedded: {
-          other: {
-            property: 'value',
-            _links: {
-              self: {href: 'http://example.com/other'}
-            },
-            _embedded: {}
+    it('when the embed value is null', function () {
+      var embeds = {other: null}
+      return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
+        expect(res).toEqual({
+          _links: {
+            self: {href: 'http://example.com'},
+            other: {href: 'http://example.com/other'}
+          },
+          _embedded: {
+            other: {
+              property: 'value',
+              _links: {
+                self: {href: 'http://example.com/other'}
+              },
+              _embedded: {}
+            }
           }
-        }
+        });
+      });
+    });
+
+    it('when the embed value is an empty object', function () {
+      var embeds = {other: {}}
+      return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
+        expect(res).toHaveProperty('_embedded.other._links.self.href', 'http://example.com/other');
       });
     });
   });
@@ -197,7 +127,8 @@ describe('getHal', function() {
       return resources[url];
     })
 
-    return getHal('http://example.com', embed('other')).then(function (res) {
+    var embeds = {other: {}}
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toEqual({
         _links: {
           self: {href: 'http://example.com'}
@@ -232,7 +163,8 @@ describe('getHal', function() {
       return resources[url];
     })
 
-    return getHal('http://example.com', [embed('other1'), embed('other2')]).then(function (res) {
+    var embeds = {other1: {}, other2: {}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toEqual({
         _links: {
           self: {href: 'http://example.com'},
@@ -281,7 +213,8 @@ describe('getHal', function() {
       return resources[url];
     })
 
-    return getHal('http://example.com', embed('other')).then(function (res) {
+    var embeds = {other: {}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toEqual({
         _links: {
           self: {href: 'http://example.com'},
@@ -304,7 +237,7 @@ describe('getHal', function() {
     });
   });
 
-  it('embeds nested resources', function () {
+  it('embeds resources in linked resources', function () {
     var resources = {
       'http://example.com': {
         _links: {
@@ -329,7 +262,8 @@ describe('getHal', function() {
       return resources[url];
     })
 
-    return getHal('http://example.com', embed('other', embed('next'))).then(function (res) {
+    var embeds = {other: {next: {}}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toEqual({
         _links: {
           self: {href: 'http://example.com'},
@@ -396,7 +330,8 @@ describe('getHal', function() {
       return resources[url];
     })
 
-    return getHal('http://example.com', embed('other', [embed('next1'), embed('next2')])).then(function (res) {
+    var embeds = {other: {next1: {}, next2: {}}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toEqual({
         _links: {
           self: {href: 'http://example.com'},
@@ -443,7 +378,8 @@ describe('getHal', function() {
 
     fetchMock.get('*', resource);
 
-    return getHal('http://example.com', embed('rel')).then(function (res) {
+    var embeds = {rel: {}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toHaveProperty('_embedded.rel._links.self.href',
           'http://example.com');
       expect(res).toHaveProperty('_embedded.rel._embedded.rel._links.self.href',
@@ -475,7 +411,8 @@ describe('getHal', function() {
       return resources[url];
     })
 
-    return getHal('http://example.com', [embed('rel1', embed('rel')), embed('rel2')]).then(function (res) {
+    var embeds = {rel1: {rel: {}}, rel2: {}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       expect(res).toHaveProperty('_embedded.rel1._links.self.href',
           'http://example.com/other');
       expect(res).toHaveProperty('_embedded.rel1._embedded.rel._links.self.href',
@@ -504,7 +441,8 @@ describe('getHal', function() {
 
     fetchMock.get('*', resource);
 
-    return getHal('http://example.com', [embed('rel1', embed('rel3')), embed('rel2')]).then(function (res) {
+    var embeds = {rel1: {rel3: {}}, rel2: {}};
+    return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
       // Verify request
       expect(fetchMock.calls('*')).toEqual([[
         'http://example.com',
@@ -525,11 +463,67 @@ describe('getHal', function() {
 });
 
 
+describe('linkHref', function() {
+  var linkHref = hally.linkHref;
 
-describe('putState', function() {
-  var putState = hally.putState;
+  var resource = {
+    _links: {
+      self: {href: 'http://example.com'},
+      rel1: {href: 'http://example.com/linked1'},
+      rel2: [{href: 'http://example.com/linked2a'}, {href: 'http://example.com/linked2b'}],
+      tpl1: {href: 'http://example.com/templated1/{foo}'},
+      tpl2: [{href: 'http://example.com/templated2a/{foo}'}, {href: 'http://example.com/templated2b/{foo}'}],
+      both: {href: 'http://example.com/both/linked'}
+    },
+    _embedded: {
+      emb1: {_links: {self: {href: 'http://example.com/embedded1'}}, _embedded: {}},
+      emb2: [{_links: {self: {href: 'http://example.com/embedded2a'}}, _embedded: {}},
+        {_links: {self: {href: 'http://example.com/embedded2b'}}, _embedded: {}}],
+      both: {_links: {self: {href: 'http://example.com/both/embedded'}}, _embedded: {}}
+    }
+  };
 
-  it('puts the resource state (without _links and _embedded)', function () {
+  it('returns the href of a link', function() {
+    expect(linkHref(resource, 'rel1')).toEqual('http://example.com/linked1');
+  });
+
+  it('returns the href of a link array', function() {
+    expect(linkHref(resource, 'rel2')).toEqual(['http://example.com/linked2a', 'http://example.com/linked2b']);
+  });
+
+  it('returns the href of a templated link', function() {
+    expect(linkHref(resource, 'tpl1', {foo: 'bar'})).toEqual('http://example.com/templated1/bar');
+  });
+
+  it('returns the href of a templated link array', function() {
+    expect(linkHref(resource, 'tpl2', {foo: 'bar'}))
+        .toEqual(['http://example.com/templated2a/bar', 'http://example.com/templated2b/bar']);
+  });
+
+  it('returns the href of an embedded resource', function() {
+    expect(linkHref(resource, 'emb1')).toEqual('http://example.com/embedded1');
+  });
+
+  it('returns the href of an embedded resource array', function() {
+    expect(linkHref(resource, 'emb2'))
+        .toEqual(['http://example.com/embedded2a', 'http://example.com/embedded2b']);
+  });
+
+  it('returns the href of a linked resources even when an embedded resource exists', function() {
+    expect(linkHref(resource, 'both')).toEqual('http://example.com/both/linked');
+  });
+
+  it('returns undefined if a link does not exist', function() {
+    expect(linkHref(resource, 'nonexistent')).toBeUndefined();
+  });
+
+});
+
+
+describe('stateBody', function() {
+  var stateBody = hally.stateBody;
+
+  it('removes the _links and _embedded properties', function() {
     var resource = {
       property: 'value',
       _links: {
@@ -537,33 +531,42 @@ describe('putState', function() {
       },
       _embedded: {
         other: {
-          property: 'othervalue',
           _links: {
             self: {href: 'http://example.com/other'}
-          }
+          },
+          _embedded: {}
         }
       }
     };
 
-    fetchMock.put('*', 204);
-
-    return putState(resource).then(function (response) {
-      // Verify the request
-      expect(fetchMock.calls('*')).toEqual([[
-        'http://example.com',
-        {
-          body: {
-            property: 'value'
-          },
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          method: 'PUT'
-        }
-      ]]);
-
-      // Verify the response
-      expect(response.status).toBe(204);
-    });
+    var body = stateBody(resource);
+    expect(body).toEqual('{"property":"value"}');
   });
+
+});
+
+
+describe('toState', function() {
+  var toState = hally.toState;
+
+  it('removes the _links and _embedded properties', function() {
+    var resource = {
+      property: 'value',
+      _links: {
+        self: {href: 'http://example.com'}
+      },
+      _embedded: {
+        other: {
+          _links: {
+            self: {href: 'http://example.com/other'}
+          },
+          _embedded: {}
+        }
+      }
+    };
+
+    var state = toState(resource);
+    expect(state).toEqual({property: 'value'});
+  });
+
 });

@@ -17,14 +17,12 @@ Its main use is to embed linked resources, even when the server returns only the
 
 ```javascript
 var hally = require('hally');
-var embed = hally.embed;
+var halJson = hally.halJson;
+var stateBody = hally.stateBody
 
-hally.getHal('http://example.com/user', [
-  embed('car'),
-  embed('friends', [
-    embed('car')
-  ])
-]).then(function (user) {
+var opts = {headers: {'Accept': 'application/hal+json'}};
+var embeds = {car: {}, friends: {car: {}}};
+fetch('https://example.com/user1', opts).then(halJson(opts, embeds)).then(function (user) {
   console.log("User name: " + user.name);
 
   var car = user._embedded.car;
@@ -35,7 +33,8 @@ hally.getHal('http://example.com/user', [
   });
 
   car.brand = 'Ford';
-  return hally.putState(car).then(function (response) {
+  var putOpts = {method: 'PUT', headers: {'Content-Type': 'applications/json'}, body: stateBody(car)};
+  return fetch(car._links.self.href, putOpts).then(function (response) {
     // Do something with PUT response
   });
 });

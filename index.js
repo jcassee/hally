@@ -6,35 +6,7 @@ var uriTemplates = require('uri-templates');
 /**
  * Module for performing HTTP GET en PUT requests for HAL resources.
  *
- * The main use is to embed linked resources, even when the server returns only the links.
- *
- * ### Example
- *
- * ```
- * var hally = require('hally');
- * var embed = hally.embed;
- *
- * hally.getHal('http://example.com/user', [
- *   embed('car'),
- *   embed('friends', [
- *     embed('car')
- *   ])
- * ]).then(function (user) {
- *   console.log("User name: " + user.name);
- *
- *   var car = user._embedded.car;
- *   console.log("Car brand: " + car.brand);
- *
- *   for (let friend of user._embedded.friends)) {
- *     console.log(friend.name + "'s car brand: " + friend._embedded.car.brand);
- *   }
- *
- *   car.brand = 'Ford';
- *   return hally.putState(car).then(function (response) {
- *     // Do something with PUT response
- *   });http://example.com
- * });
- * ```
+ * Its main use is to embed linked resources, even when the server returns only the links.
  *
  * @module hally
  */
@@ -160,27 +132,29 @@ function addToContext(context, resource) {
  * resources to embed. The resources are embedded even if they were
  * linked but not embedded by the server.
  *
- * @typedef {Object} EmbedRequest
- * @property {string}         rel      - The link relation.
- * @property {EmbedRequest[]} children - An array of embed requests for the embedded resource.
+ * The embed request key is a relation type that should be embedded, the
+ * (optional) value the embed request(s) for the embedded resources.
+ *
+ * @typedef {Object.<string, EmbedRequest|null>} EmbedRequest
  */
 
 
 /**
- * Get a HAL resource.
+ * Fetch a HAL resource.
  *
  * @param {string} uri - The resource URI.
+ * @param {Object} opts - A fetch options object to be used with any GET request for linked resources.
  * @param {EmbedRequest[]} embeds  - Embed requests for the resource.
  * @param {Context}        context - The resource context to store resources in.
  *
  * @returns {Promise<Hal>} A promise that resolves to the HAL resource.
  */
-function getResource(uri, embeds, context) {
+function fetchHalJson(uri, opts, embeds, context) {
   var promise;
   if (uri in context) {
     promise = Promise.resolve(context[uri]);
   } else {
-    promise = fetch(uri, {headers: {'Accept': 'application/hal+json'}})
+    promise = fetch(uri, opts)
         .then(function (response) {
           return response.json();
         })
@@ -191,7 +165,7 @@ function getResource(uri, embeds, context) {
   }
   context[uri] = promise;
   return promise.then(function (resource) {
-    return getAndEmbedLinks(resource, embeds, context);
+    return fetchAndEmbedLinks(resource, opts, embeds, context);
   });
 }
 
@@ -199,15 +173,20 @@ function getResource(uri, embeds, context) {
  * For all embed requests, get the linked resources and embed them.
  *
  * @param {Hal} resource - The HAL resource to process.
- * @param {EmbedRequest[]} embeds - The embed requests.
+ * @param {Object} opts - A fetch options object to be used with any GET request for linked resources.
+ * @param {EmbedRequest|null} embeds - The embed requests.
  * @param {Context} context - The resources context. Makes sure each resource is requested only once.
  *
  * @return {Promise<Hal>} A promise that resolve to the resource after all resources are embedded.
  */
-function getAndEmbedLinks(resource, embeds, context) {
-  var embedPromises = embeds.map(function (embed) {
-    return getAndEmbedLink(resource, embed, context);
+function fetchAndEmbedLinks(resource, opts, embeds, context) {
+  if (!embeds) embeds = {};
+  var embedPromises = Object.keys(embeds).map(function (rel) {
+    return fetchAndEmbedLink(resource, opts, rel, embeds[rel], context);
   })
+  // var embedPromises = embeds.map(function (embed) {
+  //   return fetchAndEmbedLink(resource, opts, embed, context);
+  // })
   return Promise.all(embedPromises)
       .then(function (/* ignore embedding result */) {
         return resource;
@@ -218,46 +197,40 @@ function getAndEmbedLinks(resource, embeds, context) {
  * Get linked resources and embed them.
  *
  * @param {Hal} resource - The HAL resource to process.
- * @param {EmbedRequest} embed - The embed request.
+ * @param {Object} opts - A fetch options object to be used with any GET request for linked resources.
+ * @param {string} rel - The link relation to embed.
+ * @param {EmbedRequest|null} embeds - Embed request for the related resource.
  * @param {Context} context - The resources context. Makes sure each resource is requested only once.
  *
  * @return {Promise<Hal>} A promise that resolve to the resource after all resources are embedded.
  */
-function getAndEmbedLink(resource, embed, context) {
-  var links;
-
-  var embedded = resource._embedded[embed.rel];
-  if (embedded) {
-    // Related resource already embedded, so use it (it was added to the context in getResource)
-    links = {href: embedded._links.self.href};
-  } else {
-    links = resource._links[embed.rel];
-  }
-
-  if (!links) {
+function fetchAndEmbedLink(resource, opts, rel, embeds, context) {
+  var hrefs = linkHref(resource, rel);
+  if (!hrefs) {
     // Link relation does not exist, skip
     return;
   }
 
   var linkedResourcesPromise;
-  if (Array.isArray(links)) {
-    linkedResourcesPromise = Promise.all(links.map(function (link) {
-      return getResource(link.href, embed.children, context);
+  if (Array.isArray(hrefs)) {
+    linkedResourcesPromise = Promise.all(hrefs.map(function (href) {
+      return fetchHalJson(href, opts, embeds, context);
     }));
   } else {
-    linkedResourcesPromise = getResource(links.href, embed.children, context);
+    linkedResourcesPromise = fetchHalJson(hrefs, opts, embeds, context);
   }
   return linkedResourcesPromise.then(function (linkedResources) {
-    resource._embedded[embed.rel] = linkedResources;
+    resource._embedded[rel] = linkedResources;
     return resource;
   });
 }
 
 
 /**
- * Convert a HAL object to its resource state, i.e. return a copy with '_links' and '_embedded' removed.
+ * Convert a HAL resource to its resource state, i.e. return a copy with '_links' and '_embedded' removed.
  *
  * @param {Hal} resource - The HAL resource.
+ *
  * @returns {Object} The resource state.
  */
 function toState(resource) {
@@ -272,62 +245,39 @@ function toState(resource) {
 
 
 /**
- * Request the embedding of a link relation.
+ * Convert a HAL resource to a fetch body, i.e. the stringified JSON with '_links' and '_embedded' removed.
  *
- * @param {string} rel - The link relation.
- * @param {EmbedRequest|EmbedRequest[]} [children] - Embedding requests for the related resource(s).
- * @return EmbedRequest
+ * @param {Hal} resource - The HAL resource.
+ *
+ * @returns {string} The fetch body.
  */
-function embed(rel, children) {
-  if (!children) {
-    children = [];
-  } else if (!Array.isArray(children)) {
-    children = [children];
-  }
-  return {rel: rel, children: children};
+function stateBody(resource) {
+  return JSON.stringify(toState(resource));
 }
 
 
 /**
  * Perform an HTTP GET request for a HAL resource and ensure certain linked resources are embedded.
  *
- * @param {string} uri - The URI of the resource to get.
- * @param {EmbedRequest|EmbedRequest[]} [embeds] - Embed request(s) for linked resources.
+ * @param {Object} opts - A fetch options object to be used with any GET request for linked resources.
+ * @param {EmbedRequest} [embeds] - Embed request(s) for linked resources.
  *
  * @returns {Promise<Hal>} A promise that resolves to the resource after all resources are embedded.
  */
-function getHal(uri, embeds) {
-  if (!embeds) {
-    embeds = [];
-  } else if (!Array.isArray(embeds)) {
-    embeds = [embeds];
+function halJson(opts, embeds) {
+  return function (response) {
+    return response.json().then(function (resource) {
+      var context = {};
+      addToContext(context, resource);
+      return fetchAndEmbedLinks(resource, opts, embeds, context);
+    })
   }
-  return getResource(uri, embeds, {});
-}
-
-
-/**
- * Perform an HTTP PUT request of a resource's state.
- *
- * @param {Hal} resource - The HAL resource.
- *
- * @returns {Promise<Response>} A promise that resolves to the HTTP response object
- *
- * @see toState
- */
-function putState(resource) {
-  return fetch(resource._links.self.href, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: toState(resource)
-  });
 }
 
 
 module.exports = {
-  embed: embed,
-  getHal: getHal,
+  halJson: halJson,
   linkHref: linkHref,
-  putState: putState,
+  stateBody: stateBody,
   toState: toState
 }
