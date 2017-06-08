@@ -513,8 +513,8 @@ describe('linkHref', function() {
     expect(linkHref(resource, 'both')).toEqual('http://example.com/both/linked');
   });
 
-  it('returns undefined if a link does not exist', function() {
-    expect(linkHref(resource, 'nonexistent')).toBeUndefined();
+  it('returns null if a link does not exist', function() {
+    expect(linkHref(resource, 'nonexistent')).toBeNull();
   });
 
 });

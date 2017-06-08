@@ -49,7 +49,7 @@ var uriTemplates = require('uri-templates');
  * @param {Hal} resource the subject resource
  * @param {string} rel the link relation type
  * @param {Object.<string, Object>} [params] parameters to expand the target href URI Template with
- * @returns {string|string[]|undefined} the target URI(s)
+ * @returns {string|string[]|null} the target URI(s)
  */
 function linkHref(resource, rel, params) {
   var link = resource._links[rel];
@@ -74,7 +74,7 @@ function linkHref(resource, rel, params) {
     });
   }
 
-  return undefined;
+  return null;
 }
 
 /**
