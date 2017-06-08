@@ -289,7 +289,7 @@ describe('halJson', function() {
     });
   });
 
-  it('embeds nested resources in embedded resources', function () {
+  it('embeds resources in embedded resources', function () {
     var resources = {
       'http://example.com': {
         _links: {
@@ -509,7 +509,7 @@ describe('linkHref', function() {
         .toEqual(['http://example.com/embedded2a', 'http://example.com/embedded2b']);
   });
 
-  it('returns the href of a linked resources even when an embedded resource exists', function() {
+  it('returns the href of a linked resource even when an embedded resource exists', function() {
     expect(linkHref(resource, 'both')).toEqual('http://example.com/both/linked');
   });
 
@@ -523,7 +523,7 @@ describe('linkHref', function() {
 describe('stateBody', function() {
   var stateBody = hally.stateBody;
 
-  it('removes the _links and _embedded properties', function() {
+  it('removes the _links and _embedded properties and stringifies', function() {
     var resource = {
       property: 'value',
       _links: {
