@@ -1,6 +1,6 @@
 {
   "name": "hally",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Module for getting and putting HAL resources",
   "author": "Joost Cassee <joost@cassee.net>",
   "license": "MIT",
