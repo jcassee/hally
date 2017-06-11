@@ -20,7 +20,11 @@ afterEach(function () {
 describe('halJson', function() {
   var halJson = hally.halJson;
 
-  var opts = {headers: {'Accept': 'application/hal+json'}};
+  var opts;
+
+  beforeEach(function () {
+    opts = {headers: {'Accept': 'application/hal+json'}};
+  });
 
   it('parses a resource', function () {
     var resource = {
@@ -109,6 +113,13 @@ describe('halJson', function() {
     it('when the embed value is an empty object', function () {
       var embeds = {other: {}}
       return fetch('http://example.com', opts).then(halJson(opts, embeds)).then(function (res) {
+        expect(res).toHaveProperty('_embedded.other._links.self.href', 'http://example.com/other');
+      });
+    });
+
+    it('when using the embeds property in opts', function () {
+      opts.embeds = {other: {}};
+      return fetch('http://example.com', opts).then(halJson(opts)).then(function (res) {
         expect(res).toHaveProperty('_embedded.other._links.self.href', 'http://example.com/other');
       });
     });

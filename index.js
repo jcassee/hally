@@ -260,11 +260,12 @@ function stateBody(resource) {
  * Perform an HTTP GET request for a HAL resource and ensure certain linked resources are embedded.
  *
  * @param {Object} opts - A fetch options object to be used with any GET request for linked resources.
- * @param {EmbedRequest} [embeds] - Embed request(s) for linked resources.
+ * @param {EmbedRequest} [embeds] - Embed request(s) for linked resources. If absent, 'opts.embeds' is used.
  *
  * @returns {Promise<Hal>} A promise that resolves to the resource after all resources are embedded.
  */
 function halJson(opts, embeds) {
+  if (!embeds) embeds = opts.embeds;
   return function (response) {
     return response.json().then(function (resource) {
       var context = {};

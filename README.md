@@ -20,9 +20,8 @@ var hally = require('hally');
 var halJson = hally.halJson;
 var stateBody = hally.stateBody
 
-var opts = {headers: {'Accept': 'application/hal+json'}};
-var embeds = {car: {}, friends: {car: {}}};
-fetch('https://example.com/user1', opts).then(halJson(opts, embeds)).then(function (user) {
+var opts = {headers: {'Accept': 'application/hal+json'}, embeds: {car: {}, friends: {car: {}}}};
+fetch('https://example.com/user1', opts).then(halJson(opts)).then(function (user) {
   console.log("User name: " + user.name);
 
   var car = user._embedded.car;
